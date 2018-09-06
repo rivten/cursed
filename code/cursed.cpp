@@ -19,7 +19,8 @@ int main(int ArgumentCount, char** Arguments)
 	u32 WindowFlags = SDL_WINDOW_SHOWN;
 
 	SDL_Window* Window = SDL_CreateWindow("cursed",
-			SDL_WINDOWPOS_UNDEFINED, SDL_WINDOWPOS_UNDEFINED, WindowWidth, WindowHeight, WindowFlags);
+			SDL_WINDOWPOS_UNDEFINED, SDL_WINDOWPOS_UNDEFINED, 
+			WindowWidth, WindowHeight, WindowFlags);
 	Assert(Window);
 
 	SDL_Quit();
