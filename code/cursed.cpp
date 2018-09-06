@@ -1,7 +1,27 @@
 #include <iostream>
 
+#ifdef _WIN32
+#include <SDL.h>
+#else
+#include <SDL2/SDL.h>
+#endif
+
+#include "common.h"
+
+#define SDL_CHECK(Call) {Assert(Call == 0);}
+
 int main(int ArgumentCount, char** Arguments)
 {
-	printf("Hello, sailor!\n");
+	SDL_CHECK(SDL_Init(SDL_INIT_VIDEO));
+
+	u32 WindowWidth = 200;
+	u32 WindowHeight = 200;
+	u32 WindowFlags = SDL_WINDOW_SHOWN;
+
+	SDL_Window* Window = SDL_CreateWindow("cursed",
+			SDL_WINDOWPOS_UNDEFINED, SDL_WINDOWPOS_UNDEFINED, WindowWidth, WindowHeight, WindowFlags);
+	Assert(Window);
+
+	SDL_Quit();
 	return(0);
 }
