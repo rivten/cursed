@@ -122,7 +122,6 @@ int main(int ArgumentCount, char** Arguments)
 	cursed_state Cursed = CursedInit(TileCount, TileSize);
 	Cursed.Buffer[TestIndex].C = 'a';
 
-#if 0
 	FILE* FontFileHandle = fopen("../data/NotoMono-Regular.ttf", "rb");
 	Assert(FontFileHandle);
 	u32 FontFileSize = GetFileSizeInBytes(FontFileHandle);
@@ -145,44 +144,42 @@ int main(int ArgumentCount, char** Arguments)
 	stbtt_BakeFontBitmap(FontDataBuffer, 0, float(TileSize), Bitmap.Data, 
 			Bitmap.Width, Bitmap.Height, 0, CharCount, CharacterData);
 	free(FontDataBuffer);
-#endif
 
 	bitmap DisplayedBitmap = {};
-	//DisplayedBitmap.Width = Bitmap.Width;
-	//DisplayedBitmap.Height = Bitmap.Height;
-	DisplayedBitmap.Width = WindowSize.x;
-	DisplayedBitmap.Height = WindowSize.y;
+	DisplayedBitmap.Width = Bitmap.Width;
+	DisplayedBitmap.Height = Bitmap.Height;
 	DisplayedBitmap.Depth = 32;
 	DisplayedBitmap.Pitch = sizeof(u32) * DisplayedBitmap.Width;
 	DisplayedBitmap.Data = (u8 *)malloc(sizeof(u32) * DisplayedBitmap.Width * DisplayedBitmap.Height);
 	Assert(DisplayedBitmap.Data);
 
-	for(s32 PixelIndex = 0; PixelIndex < DisplayedBitmap.Width * DisplayedBitmap.Height; ++PixelIndex)
+	u32* OnePastLastPixel = ((u32* )DisplayedBitmap.Data + (DisplayedBitmap.Width * DisplayedBitmap.Height));
+	u32 PixelIndex = 0;
+	for(u32* Pixel = (u32 *)DisplayedBitmap.Data; Pixel != OnePastLastPixel; ++Pixel, ++PixelIndex)
 	{
-		u8 R = 0xFF;
+		u8 R = 0x00;
 		u8 G = 0x00;
 		u8 B = 0x00;
-		//u8 A = Bitmap.Data[PixelIndex];
-		u8 A = 0xFF;
-		DisplayedBitmap.Data[PixelIndex] = (R << 24) | (G << 16) | (B << 8) | (A << 0);
+		u8 A = Bitmap.Data[PixelIndex];
+		*Pixel = (R << 0) | (G << 8) | (B << 16) | (A << 24);
 	}
-	//free(Bitmap.Data);
+	free(Bitmap.Data);
 
 #if SDL_BYTEORDER == SDL_BIG_ENDIAN
 	SDL_Surface* Surface = SDL_CreateRGBSurfaceFrom(DisplayedBitmap.Data, DisplayedBitmap.Width, 
 			DisplayedBitmap.Height, DisplayedBitmap.Depth, DisplayedBitmap.Pitch, 
 			0xFF000000, 0x00FF0000, 0x0000FF00, 0x000000FF);
 #else
-	SDL_Surface* Surface = SDL_CreateRGBSurfaceFrom((void *)DisplayedBitmap.Data, DisplayedBitmap.Width, 
+	SDL_Surface* Surface = SDL_CreateRGBSurfaceFrom(DisplayedBitmap.Data, DisplayedBitmap.Width, 
 			DisplayedBitmap.Height, DisplayedBitmap.Depth, DisplayedBitmap.Pitch, 
 			0x000000FF, 0x0000FF00, 0x00FF0000, 0xFF000000);
 #endif
 	Assert(Surface);
-	free(DisplayedBitmap.Data);
 
 	SDL_Texture* Texture = SDL_CreateTextureFromSurface(Renderer, Surface);
 	Assert(Texture);
 	SDL_FreeSurface(Surface);
+	free(DisplayedBitmap.Data);
 
 	u32 LastCounter = SDL_GetTicks();
 	float TargetSecondsPerFrame = 1.0f / 60.0f;
