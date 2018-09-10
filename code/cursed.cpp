@@ -145,6 +145,19 @@ int main(int ArgumentCount, char** Arguments)
 			Bitmap.Width, Bitmap.Height, 0, CharCount, CharacterData);
 	free(FontDataBuffer);
 
+#if 0
+	// NOTE(hugo): Debug: dumping all character data
+	{
+		for(u32 CharIndex = 0; CharIndex < 256; ++CharIndex)
+		{
+			stbtt_bakedchar* Data = CharacterData + CharIndex;
+			printf("Char %i\nx0 = %u, y0 = %u\nx1 = %u, y1 = %u\nxoff = %f, yoff = %f, xadvance = %f\n",
+					CharIndex, Data->x0, Data->y0, Data->x1, Data->y1, Data->xoff, Data->yoff, Data->xadvance);
+		}
+	}
+#endif
+
+
 	bitmap DisplayedBitmap = {};
 	DisplayedBitmap.Width = Bitmap.Width;
 	DisplayedBitmap.Height = Bitmap.Height;
@@ -213,7 +226,13 @@ int main(int ArgumentCount, char** Arguments)
 		SDL_RenderClear(Renderer);
 
 		CursedRender(&Cursed, Renderer);
-		SDL_RenderCopy(Renderer, Texture, 0, 0);
+
+		SDL_Rect DestRect = {};
+		DestRect.x = 0;
+		DestRect.y = 0;
+		DestRect.w = DisplayedBitmap.Width;
+		DestRect.h = DisplayedBitmap.Height;
+		SDL_RenderCopy(Renderer, Texture, 0, &DestRect);
 
 		SDL_RenderPresent(Renderer);
 
