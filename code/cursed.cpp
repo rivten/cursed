@@ -32,6 +32,11 @@ struct cursed_state
 	tile* Buffer;
 	u32 TileSize;
 	v2i TileCount;
+
+    SDL_Renderer* Renderer;
+    SDL_Texture* FontTexture;
+    stbtt_bakedchar* BakedData;
+    u32 BakedCount;
 };
 
 struct bitmap
@@ -59,13 +64,19 @@ CursedInit(v2i TileCount, u32 TileSize)
 }
 
 internal void
-CursedRender(cursed_state* State, SDL_Renderer* Renderer, SDL_Texture* FontTexture, bitmap Bitmap, stbtt_bakedchar* BakedCharData, u32 BakedCharDataCount)
+CursedClear(cursed_state* State)
+{
+    ZeroBuffer(State->Buffer, State->TileCount.x * State->TileCount.y);
+}
+
+internal void
+CursedRender(cursed_state* State)
 {
 	u32 TileCount = State->TileCount.x * State->TileCount.y;
 	for(u32 TileIndex = 0; TileIndex < TileCount; ++TileIndex)
 	{
 		tile* Tile = State->Buffer + TileIndex;
-        stbtt_bakedchar* BakedData = BakedCharData + Tile->C;
+        stbtt_bakedchar* BakedData = State->BakedData + Tile->C;
         SDL_Rect SourceRect = {};
         SourceRect.x = BakedData->x0;
         SourceRect.y = BakedData->y0;
@@ -74,12 +85,35 @@ CursedRender(cursed_state* State, SDL_Renderer* Renderer, SDL_Texture* FontTextu
 
         SDL_Rect DestRect = {};
         DestRect.x = State->TileSize * (TileIndex % State->TileCount.x);
-        DestRect.y = State->TileSize * (TileIndex / State->TileCount.x);
+        DestRect.y = State->TileSize * (TileIndex / State->TileCount.x) + State->TileSize - SourceRect.h;
         DestRect.w = SourceRect.w;
         DestRect.h = SourceRect.h;
 
-        SDL_RenderCopy(Renderer, FontTexture, &SourceRect, &DestRect);
+        SDL_RenderCopy(State->Renderer, State->FontTexture, &SourceRect, &DestRect);
 	}
+}
+
+inline u32
+StringLength(char* Str)
+{
+    u32 Result = 0;
+    char* C = Str;
+    while(C && *C != '\0')
+    {
+        ++C;
+        ++Result;
+    }
+    return(Result);
+}
+
+internal void
+CursedPrint(cursed_state* State, char* Str)
+{
+    u32 Length = StringLength(Str);
+    for(u32 Index = 0; Index < Length; ++Index)
+    {
+        State->Buffer[Index].C = Str[Index];
+    }
 }
 
 // TODO(hugo):  This should not be in here
@@ -121,10 +155,14 @@ int main(int ArgumentCount, char** Arguments)
 	Assert(Renderer);
 
 	cursed_state Cursed = CursedInit(TileCount, TileSize);
-    for(u32 Index = 0; Index < 256; ++Index)
+    Cursed.Renderer = Renderer;
+#if 0
+    for(s32 Index = 0; Index < TileCount.x * TileCount.y; ++Index)
     {
-        Cursed.Buffer[Index].C = Index & 0xFF;
+        char C = (Index % ('z' - 'a' + 1)) + 'a';
+        Cursed.Buffer[Index].C = C;
     }
+#endif
 
 	FILE* FontFileHandle = fopen("../data/NotoMono-Regular.ttf", "rb");
 	Assert(FontFileHandle);
@@ -134,9 +172,9 @@ int main(int ArgumentCount, char** Arguments)
 	FontDataBuffer[FontFileSize] = 0;
 	fclose(FontFileHandle);
 
-	u32 CharCount = 256;
-	stbtt_bakedchar* CharacterData = (stbtt_bakedchar *)malloc(CharCount * sizeof(stbtt_bakedchar));
-	Assert(CharacterData);
+	Cursed.BakedCount = 256;
+	Cursed.BakedData = (stbtt_bakedchar *)malloc(Cursed.BakedCount * sizeof(stbtt_bakedchar));
+	Assert(Cursed.BakedData);
 
 	bitmap Bitmap = {};
 	Bitmap.Width = 16 * TileSize;
@@ -146,7 +184,7 @@ int main(int ArgumentCount, char** Arguments)
 	Bitmap.Data = (u8 *)malloc(sizeof(u8) * Bitmap.Width * Bitmap.Height);
 
 	stbtt_BakeFontBitmap(FontDataBuffer, 0, float(TileSize), Bitmap.Data, 
-			Bitmap.Width, Bitmap.Height, 0, CharCount, CharacterData);
+			Bitmap.Width, Bitmap.Height, 0, Cursed.BakedCount, Cursed.BakedData);
 	free(FontDataBuffer);
 
 #if 0
@@ -155,8 +193,8 @@ int main(int ArgumentCount, char** Arguments)
 		for(u32 CharIndex = 0; CharIndex < 256; ++CharIndex)
 		{
 			stbtt_bakedchar* Data = CharacterData + CharIndex;
-			printf("Char %i\nx0 = %u, y0 = %u\nx1 = %u, y1 = %u\nxoff = %f, yoff = %f, xadvance = %f\n",
-					CharIndex, Data->x0, Data->y0, Data->x1, Data->y1, Data->xoff, Data->yoff, Data->xadvance);
+			printf("Char %i(%c)\nx0 = %u, y0 = %u\nx1 = %u, y1 = %u\nxoff = %f, yoff = %f, xadvance = %f\n",
+					CharIndex, CharIndex, Data->x0, Data->y0, Data->x1, Data->y1, Data->xoff, Data->yoff, Data->xadvance);
 		}
 	}
 #endif
@@ -174,9 +212,9 @@ int main(int ArgumentCount, char** Arguments)
 	u32 PixelIndex = 0;
 	for(u32* Pixel = (u32 *)DisplayedBitmap.Data; Pixel != OnePastLastPixel; ++Pixel, ++PixelIndex)
 	{
-		u8 R = 0x00;
-		u8 G = 0x00;
-		u8 B = 0x00;
+		u8 R = 0xFF;
+		u8 G = 0xFF;
+		u8 B = 0xFF;
 		u8 A = Bitmap.Data[PixelIndex];
 		*Pixel = (R << 0) | (G << 8) | (B << 16) | (A << 24);
 	}
@@ -193,8 +231,8 @@ int main(int ArgumentCount, char** Arguments)
 #endif
 	Assert(Surface);
 
-	SDL_Texture* FontTexture = SDL_CreateTextureFromSurface(Renderer, Surface);
-	Assert(FontTexture);
+	Cursed.FontTexture = SDL_CreateTextureFromSurface(Renderer, Surface);
+	Assert(Cursed.FontTexture);
 	SDL_FreeSurface(Surface);
 	free(DisplayedBitmap.Data);
 
@@ -218,20 +256,14 @@ int main(int ArgumentCount, char** Arguments)
 			}
 		}
 
-#if 0
-		Cursed.Buffer[TestIndex].C = 0;
-		++TestIndex;
-		if(TestIndex >= Cursed.TileCount.x * Cursed.TileCount.y)
-		{
-			TestIndex = 0;
-		}
-		Cursed.Buffer[TestIndex].C = 'a';
-#endif
-
 		SDL_SetRenderDrawColor(Renderer, 112, 128, 144, 255);
 		SDL_RenderClear(Renderer);
 
-		CursedRender(&Cursed, Renderer, FontTexture, DisplayedBitmap, CharacterData, CharCount);
+        CursedClear(&Cursed);
+
+        CursedPrint(&Cursed, "Hello, sailor!");
+
+		CursedRender(&Cursed);
 
 		SDL_RenderPresent(Renderer);
 

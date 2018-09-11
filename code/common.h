@@ -33,6 +33,7 @@ typedef size_t memory_index;
 #define Gigabytes(Value) (Megabytes(Value)*1024LL)
 #define Terabytes(Value) (Gigabytes(Value)*1024LL)
 
+#define ZeroBuffer(Instance, Count) ZeroSize(sizeof(Instance[0]) * Count, Instance)
 #define ZeroStruct(Instance) ZeroSize(sizeof(Instance), &(Instance))
 void ZeroSize(memory_index Size, void* Ptr)
 {
