@@ -37,6 +37,8 @@ struct cursed_state
     SDL_Texture* FontTexture;
     stbtt_bakedchar* BakedData;
     u32 BakedCount;
+
+	v2i WritingCursor;
 };
 
 struct bitmap
@@ -59,6 +61,8 @@ CursedInit(v2i TileCount, u32 TileSize)
 	Result.Buffer = (tile *)malloc(BufferSize);
 	Assert(Result.Buffer);
 	ZeroSize(BufferSize, Result.Buffer);
+
+	Result.WritingCursor = {};
 
 	return(Result);
 }
@@ -106,13 +110,30 @@ StringLength(char* Str)
     return(Result);
 }
 
-internal void
-CursedPrint(cursed_state* State, char* Str)
+internal u32
+GetCursorIndex(cursed_state* State)
 {
-    u32 Length = StringLength(Str);
-    for(u32 Index = 0; Index < Length; ++Index)
+	u32 Result = State->WritingCursor.x + State->WritingCursor.y * State->TileCount.x;
+	return(Result);
+}
+
+internal void
+CursedPrintStr(cursed_state* State, u32 PosX, u32 PosY, char* Format, ...)
+{
+	char Buffer[512] = {};
+	va_list VarArgs = {};
+	va_start(VarArgs, Format);
+	s32 CharWritten = vsprintf(Buffer, Format, VarArgs);
+	Assert(CharWritten >= 0);
+	Assert(CharWritten <= (s32)ArrayCount(Buffer));
+	va_end(VarArgs);
+
+	State->WritingCursor = V2i(PosX, PosY);
+    for(s32 Index = 0; Index < CharWritten; ++Index)
     {
-        State->Buffer[Index].C = Str[Index];
+		u32 CursorIndex = GetCursorIndex(State);
+        State->Buffer[CursorIndex].C = Buffer[Index];
+		++State->WritingCursor.x;
     }
 }
 
@@ -261,7 +282,11 @@ int main(int ArgumentCount, char** Arguments)
 
         CursedClear(&Cursed);
 
-        CursedPrint(&Cursed, "Hello, sailor!");
+		v2i Pos = V2i(10, 3);
+		local_persist u32 FrameIndex = 0;
+		++FrameIndex;
+        CursedPrintStr(&Cursed, Pos.x, Pos.y, "Hello, sailor!");
+        CursedPrintStr(&Cursed, Pos.x, Pos.y + 1, "Frame Index = %i", FrameIndex);
 
 		CursedRender(&Cursed);
 
