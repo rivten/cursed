@@ -34,6 +34,15 @@ struct cursed_state
 	v2i TileCount;
 };
 
+struct bitmap
+{
+	s32 Width;
+	s32 Height;
+	s32 Depth;
+	s32 Pitch;
+	u8* Data;
+};
+
 internal cursed_state
 CursedInit(v2i TileCount, u32 TileSize)
 {
@@ -50,23 +59,26 @@ CursedInit(v2i TileCount, u32 TileSize)
 }
 
 internal void
-CursedRender(cursed_state* State, SDL_Renderer* Renderer)
+CursedRender(cursed_state* State, SDL_Renderer* Renderer, SDL_Texture* FontTexture, bitmap Bitmap, stbtt_bakedchar* BakedCharData, u32 BakedCharDataCount)
 {
 	u32 TileCount = State->TileCount.x * State->TileCount.y;
 	for(u32 TileIndex = 0; TileIndex < TileCount; ++TileIndex)
 	{
 		tile* Tile = State->Buffer + TileIndex;
-		if(Tile->C == 'a')
-		{
-			SDL_SetRenderDrawColor(Renderer, 255, 0, 0, 255);
-			SDL_Rect Rect = {};
-			Rect.x = State->TileSize * (TileIndex % State->TileCount.x);
-			Rect.y = State->TileSize * (TileIndex / State->TileCount.x);
-			Rect.w = State->TileSize;
-			Rect.h = State->TileSize;
+        stbtt_bakedchar* BakedData = BakedCharData + Tile->C;
+        SDL_Rect SourceRect = {};
+        SourceRect.x = BakedData->x0;
+        SourceRect.y = BakedData->y0;
+        SourceRect.w = BakedData->x1 - BakedData->x0;
+        SourceRect.h = BakedData->y1 - BakedData->y0;
 
-			SDL_RenderFillRect(Renderer, &Rect);
-		}
+        SDL_Rect DestRect = {};
+        DestRect.x = State->TileSize * (TileIndex % State->TileCount.x);
+        DestRect.y = State->TileSize * (TileIndex / State->TileCount.x);
+        DestRect.w = SourceRect.w;
+        DestRect.h = SourceRect.h;
+
+        SDL_RenderCopy(Renderer, FontTexture, &SourceRect, &DestRect);
 	}
 }
 
@@ -88,15 +100,6 @@ u32 GetFileSizeInBytes(FILE* f)
 	return(FileSize);
 }
 
-struct bitmap
-{
-	s32 Width;
-	s32 Height;
-	s32 Depth;
-	s32 Pitch;
-	u8* Data;
-};
-
 int main(int ArgumentCount, char** Arguments)
 {
 	SDL_CHECK(SDL_Init(SDL_INIT_VIDEO));
@@ -117,10 +120,11 @@ int main(int ArgumentCount, char** Arguments)
 		SDL_CreateRenderer(Window, -1, RendererFlags);
 	Assert(Renderer);
 
-	s32 TestIndex = 0;
-
 	cursed_state Cursed = CursedInit(TileCount, TileSize);
-	Cursed.Buffer[TestIndex].C = 'a';
+    for(u32 Index = 0; Index < 256; ++Index)
+    {
+        Cursed.Buffer[Index].C = Index & 0xFF;
+    }
 
 	FILE* FontFileHandle = fopen("../data/NotoMono-Regular.ttf", "rb");
 	Assert(FontFileHandle);
@@ -189,8 +193,8 @@ int main(int ArgumentCount, char** Arguments)
 #endif
 	Assert(Surface);
 
-	SDL_Texture* Texture = SDL_CreateTextureFromSurface(Renderer, Surface);
-	Assert(Texture);
+	SDL_Texture* FontTexture = SDL_CreateTextureFromSurface(Renderer, Surface);
+	Assert(FontTexture);
 	SDL_FreeSurface(Surface);
 	free(DisplayedBitmap.Data);
 
@@ -214,6 +218,7 @@ int main(int ArgumentCount, char** Arguments)
 			}
 		}
 
+#if 0
 		Cursed.Buffer[TestIndex].C = 0;
 		++TestIndex;
 		if(TestIndex >= Cursed.TileCount.x * Cursed.TileCount.y)
@@ -221,18 +226,12 @@ int main(int ArgumentCount, char** Arguments)
 			TestIndex = 0;
 		}
 		Cursed.Buffer[TestIndex].C = 'a';
+#endif
 
 		SDL_SetRenderDrawColor(Renderer, 112, 128, 144, 255);
 		SDL_RenderClear(Renderer);
 
-		CursedRender(&Cursed, Renderer);
-
-		SDL_Rect DestRect = {};
-		DestRect.x = 0;
-		DestRect.y = 0;
-		DestRect.w = DisplayedBitmap.Width;
-		DestRect.h = DisplayedBitmap.Height;
-		SDL_RenderCopy(Renderer, Texture, 0, &DestRect);
+		CursedRender(&Cursed, Renderer, FontTexture, DisplayedBitmap, CharacterData, CharCount);
 
 		SDL_RenderPresent(Renderer);
 
